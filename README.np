@@ -2,6 +2,13 @@
 This version of the sony-laptop module is the one distributed by
 Eva (see original README) plus the following changes:
 
+0.9np9
+  - "Make the sony-laptop driver define its PM callbacks through
+  a struct dev_pm_ops object rather than by using legacy PM hooks
+  in struct acpi_device_ops", copy/pasted from
+  http://lkml.indiana.edu/hypermail/linux/kernel/1206.2/03722.html
+  (requirement to run with kernel 3.6+)
+
 0.9np8
   - no changes to the code since pre3
 
