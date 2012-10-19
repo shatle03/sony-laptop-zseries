@@ -1,4 +1,4 @@
-This is an update to the sony-laptop kernel module for Z series laptop. This driver has been tested on a VGN-Z21VN/X. It can break other Vaio laptops. 
+#### This is no 'official' version, I just copied the version found at https://gitorious.org/sony-laptop-zseries and changed it to compile with kernel 3.6.2 (by copy/pasting other changes). I have no idea what I did and if this really works, but it seems to be ok for me. Hope you will find this useful, Rene  #### 
 
 Disclaimer: This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
