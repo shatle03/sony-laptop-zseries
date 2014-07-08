@@ -1,3 +1,5 @@
+#### now fixed to compile with kernel 3.15.3 and tagged as version Sony Notebook Control Driver v0.9np10
+
 #### This is no 'official' version, I just copied the version found at https://gitorious.org/sony-laptop-zseries and changed it to compile with kernel 3.6.2 (by copy/pasting other changes). I have no idea what I did and if this really works, but it seems to be ok for me. Hope you will find this useful, Rene  #### 
 
 Disclaimer: This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
