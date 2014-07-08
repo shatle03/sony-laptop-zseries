@@ -69,9 +69,6 @@
 #include <linux/workqueue.h>
 #include <linux/acpi.h>
 #include <linux/slab.h>
-#include <acpi/acpi_drivers.h>
-#include <acpi/acpi_bus.h>
-#include <linux/uaccess.h>
 #include <linux/sonypi.h>
 #include <linux/sony-laptop.h>
 #include <linux/rfkill.h>
@@ -82,7 +79,7 @@
 #ifdef SONY_ZSERIES
 #include <linux/version.h>
 #endif
-
+#include <asm/uaccess.h>
 
 #define dprintk(fmt, ...)			\
 do {						\
@@ -91,7 +88,7 @@ do {						\
 } while (0)
 
 #ifdef SONY_ZSERIES
-#define SONY_LAPTOP_DRIVER_VERSION     "0.9np9"
+#define SONY_LAPTOP_DRIVER_VERSION     "0.9np10"
 #else
 #define SONY_LAPTOP_DRIVER_VERSION	"0.6"
 #endif
@@ -182,6 +179,22 @@ static char *sony_acpi_path_hsc1[] =
 /* static acpi_handle sony_nc_acpi_handle; */
 static int acpi_callgetfunc(acpi_handle, char*, unsigned int*);
 #endif
+
+enum sony_nc_rfkill {
+	SONY_WIFI,
+	SONY_BLUETOOTH,
+	SONY_WWAN,
+	SONY_WIMAX,
+	N_SONY_RFKILL,
+};
+
+static int sony_rfkill_handle;
+static int sony_rfkill_address[N_SONY_RFKILL] = {0x300, 0x500, 0x700, 0x900};
+static int sony_nc_rfkill_setup(struct acpi_device *device,
+		unsigned int handle);
+static void sony_nc_rfkill_cleanup(void);
+static void sony_nc_rfkill_update(void);
+
 /*********** Input Devices ***********/
 
 #define SONY_LAPTOP_BUF_SIZE	128
@@ -374,6 +387,7 @@ static void sony_laptop_report_input_event(u8 event)
 	struct input_dev *jog_dev = sony_laptop_input.jog_dev;
 	struct input_dev *key_dev = sony_laptop_input.key_dev;
 	struct sony_laptop_keypress kp = { NULL };
+	int scancode = -1;
 
 	if (event == SONYPI_EVENT_FNKEY_RELEASED ||
 			event == SONYPI_EVENT_ANYBUTTON_RELEASED) {
@@ -404,12 +418,11 @@ static void sony_laptop_report_input_event(u8 event)
 
 	default:
 		if (event >= ARRAY_SIZE(sony_laptop_input_index)) {
-			dprintk("sony_laptop_report_input_event, "
-				"event not known: %d\n", event);
+			dprintk("sony_laptop_report_input_event, event not known: %d\n", event);
 			break;
 		}
-		if (sony_laptop_input_index[event] != -1) {
-			kp.key = sony_laptop_input_keycode_map[sony_laptop_input_index[event]];
+		if ((scancode = sony_laptop_input_index[event]) != -1) {
+			kp.key = sony_laptop_input_keycode_map[scancode];
 			if (kp.key != KEY_UNKNOWN)
 				kp.dev = key_dev;
 		}
@@ -417,9 +430,11 @@ static void sony_laptop_report_input_event(u8 event)
 	}
 
 	if (kp.dev) {
+		/* if we have a scancode we emit it so we can always
+		    remap the key */
+		if (scancode != -1)
+			input_event(kp.dev, EV_MSC, MSC_SCAN, scancode);
 		input_report_key(kp.dev, kp.key, 1);
-		/* we emit the scancode so we can always remap the key */
-		input_event(kp.dev, EV_MSC, MSC_SCAN, event);
 		input_sync(kp.dev);
 
 		/* schedule key release */
@@ -494,7 +509,7 @@ static int sony_laptop_setup_input(struct acpi_device *acpi_device)
 	jog_dev->name = "Sony Vaio Jogdial";
 	jog_dev->id.bustype = BUS_ISA;
 	jog_dev->id.vendor = PCI_VENDOR_ID_SONY;
-	key_dev->dev.parent = &acpi_device->dev;
+	jog_dev->dev.parent = &acpi_device->dev;
 
 	input_set_capability(jog_dev, EV_KEY, BTN_MIDDLE);
 	input_set_capability(jog_dev, EV_REL, REL_WHEEL);
@@ -757,12 +772,12 @@ static int sony_pf_add(void)
 
 	return 0;
 
-out_platform_alloced:
+      out_platform_alloced:
 	platform_device_put(sony_pf_device);
 	sony_pf_device = NULL;
-out_platform_registered:
+      out_platform_registered:
 	platform_driver_unregister(&sony_pf_driver);
-out:
+      out:
 	atomic_dec(&sony_pf_users);
 	return ret;
 }
@@ -856,8 +871,7 @@ static struct sony_nc_value sony_nc_values[] = {
 	SNC_HANDLE(brightness_default, snc_brightness_def_get,
 			snc_brightness_def_set, brightness_default_validate, 0),
 	SNC_HANDLE(fnkey, snc_fnkey_get, NULL, NULL, 0),
-	SNC_HANDLE(cdpower, snc_cdpower_get, snc_cdpower_set,
-			boolean_validate, 0),
+	SNC_HANDLE(cdpower, snc_cdpower_get, snc_cdpower_set, boolean_validate, 0),
 	SNC_HANDLE(audiopower, snc_audiopower_get, snc_audiopower_set,
 			boolean_validate, 0),
 	SNC_HANDLE(lanpower, snc_lanpower_get, snc_lanpower_set,
@@ -877,10 +891,12 @@ static struct sony_nc_value sony_nc_values[] = {
 };
 
 static acpi_handle sony_nc_acpi_handle;
-static struct acpi_device *sony_nc_acpi_device;
+static struct acpi_device *sony_nc_acpi_device = NULL;
 
 /*
  * acpi_evaluate_object wrappers
+ * all useful calls into SNC methods take one or zero parameters and return
+ * integers or arrays.
  */
 static int acpi_callgetfunc(acpi_handle handle, char *name,
 				unsigned int *result)
@@ -1335,13 +1351,6 @@ static int sony_nc_hotkeys_decode(unsigned int handle)
 	return ret;
 }
 
-enum sony_nc_rfkill {
-	SONY_WIFI,
-	SONY_BLUETOOTH,
-	SONY_WWAN,
-	SONY_WIMAX,
-	N_SONY_RFKILL,
-};
 struct sony_rfkill_data {
 	struct rfkill *devices[N_SONY_RFKILL];
 	const unsigned int address[N_SONY_RFKILL];
@@ -1411,35 +1420,15 @@ static void sony_nc_rfkill_cleanup(void)
 
 static int sony_nc_rfkill_set(void *data, bool blocked)
 {
-	unsigned int result, argument = sony_rfkill.address[(long) data];
+	int result;
+	int argument = sony_rfkill_address[(long) data] + 0x100;
 
-	/* wwan state change not allowed when the battery is not present */
-	sony_call_snc_handle(sony_rfkill.handle, 0x0200, &result);
-	if (((long) data == SONY_WWAN) && !(result & 0x2)) {
-		if (!blocked) {
-			/* notify user space: the battery must be present */
-			acpi_bus_generate_proc_event(sony_nc_acpi_device,
-				       2, 2);
-			acpi_bus_generate_netlink_event(
-					sony_nc_acpi_device->pnp.device_class,
-					dev_name(&sony_nc_acpi_device->dev),
-					2, 2);
-		}
-
-		return -1;
-	}
-
-	/* do not force an already set state */
-	sony_call_snc_handle(sony_rfkill.handle, argument, &result);
-	if ((result & 0x1) == !blocked)
-		return 0;
-
-	argument += 0x100;
 	if (!blocked)
-		argument |= 0xff0000;
+		argument |= 0x070000;
 
-	return sony_call_snc_handle(sony_rfkill.handle, argument, &result);
+	return sony_call_snc_handle(sony_rfkill_handle, argument, &result);
 }
+
 
 static const struct rfkill_ops sony_rfkill_ops = {
 	.set_block = sony_nc_rfkill_set,
@@ -2278,8 +2267,6 @@ static int sony_nc_als_update_status(struct backlight_device *bd)
 						KOBJ_CHANGE, env);
 
 			dprintk("generating ALS event 3 (reason: 2)\n");
-			acpi_bus_generate_proc_event(sony_nc_acpi_device,
-					3, 2);
 			acpi_bus_generate_netlink_event(
 					sony_nc_acpi_device->pnp.device_class,
 					dev_name(&sony_nc_acpi_device->dev),
@@ -4523,7 +4510,6 @@ static void sony_nc_notify(struct acpi_device *device, u32 event)
 		sony_laptop_report_input_event(event);
 	}
 
-	acpi_bus_generate_proc_event(device, ev, value);
 	acpi_bus_generate_netlink_event(device->pnp.device_class,
 					dev_name(&device->dev), ev, value);
 }
@@ -4654,7 +4640,7 @@ outwalk:
 	return result;
 }
 
-static int sony_nc_remove(struct acpi_device *device, int type)
+static int sony_nc_remove(struct acpi_device *device)
 {
 	struct sony_nc_value *item;
 
@@ -5269,28 +5255,28 @@ int sony_pic_camera_command(int command, u8 value)
 			__sony_pic_camera_off();
 		break;
 	case SONY_PIC_COMMAND_SETCAMERABRIGHTNESS:
-		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_BRIGHTNESS,
-				value),	ITERATIONS_SHORT);
+		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_BRIGHTNESS, value),
+				ITERATIONS_SHORT);
 		break;
 	case SONY_PIC_COMMAND_SETCAMERACONTRAST:
-		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_CONTRAST,
-				value),	ITERATIONS_SHORT);
+		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_CONTRAST, value),
+				ITERATIONS_SHORT);
 		break;
 	case SONY_PIC_COMMAND_SETCAMERAHUE:
 		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_HUE, value),
 				ITERATIONS_SHORT);
 		break;
 	case SONY_PIC_COMMAND_SETCAMERACOLOR:
-		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_COLOR,
-				value),	ITERATIONS_SHORT);
+		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_COLOR, value),
+				ITERATIONS_SHORT);
 		break;
 	case SONY_PIC_COMMAND_SETCAMERASHARPNESS:
-		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_SHARPNESS,
-				value),	ITERATIONS_SHORT);
+		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_SHARPNESS, value),
+				ITERATIONS_SHORT);
 		break;
 	case SONY_PIC_COMMAND_SETCAMERAPICTURE:
-		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_PICTURE,
-				value),	ITERATIONS_SHORT);
+		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_PICTURE, value),
+				ITERATIONS_SHORT);
 		break;
 	case SONY_PIC_COMMAND_SETCAMERAAGC:
 		wait_on_command(sony_pic_call3(0x90, SONYPI_CAMERA_AGC, value),
@@ -6058,7 +6044,6 @@ static irqreturn_t sony_pic_irq(int irq, void *dev_id)
 
 found:
 	sony_laptop_report_input_event(device_event);
-	acpi_bus_generate_proc_event(dev->acpi_dev, 1, device_event);
 	sonypi_compat_report_event(device_event);
 	return IRQ_HANDLED;
 }
@@ -6068,7 +6053,7 @@ found:
  *  ACPI driver
  *
  *****************/
-static int sony_pic_remove(struct acpi_device *device, int type)
+static int sony_pic_remove(struct acpi_device *device)
 {
 	struct sony_pic_ioport *io, *tmp_io;
 	struct sony_pic_irq *irq, *tmp_irq;
