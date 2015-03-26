@@ -88,7 +88,7 @@ do {						\
 } while (0)
 
 #ifdef SONY_ZSERIES
-#define SONY_LAPTOP_DRIVER_VERSION     "0.9np10"
+#define SONY_LAPTOP_DRIVER_VERSION     "0.9np11"
 #else
 #define SONY_LAPTOP_DRIVER_VERSION	"0.6"
 #endif
@@ -1214,7 +1214,7 @@ static ssize_t sony_nc_sysfs_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value))
+	if (kstrtoul(buffer, 10, &value))
 		return -EINVAL;
 
 	if (item->validate)
@@ -2315,7 +2315,7 @@ static ssize_t sony_nc_als_power_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value) || value > 1)
+	if (kstrtoul(buffer, 10, &value) || value > 1)
 		return -EINVAL;
 
 	/* no action if already set */
@@ -2353,7 +2353,7 @@ static ssize_t sony_nc_als_managed_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value) || value > 1)
+	if (kstrtoul(buffer, 10, &value) || value > 1)
 		return -EINVAL;
 
 	if (sony_als->managed != value) {
@@ -2429,7 +2429,7 @@ static ssize_t sony_nc_als_backlight_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value))
+	if (kstrtoul(buffer, 10, &value))
 		return -EINVAL;
 
 	if (!sony_als->managed)
@@ -2674,7 +2674,7 @@ static ssize_t sony_nc_kbd_backlight_mode_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value))
+	if (kstrtoul(buffer, 10, &value))
 		return -EINVAL;
 
 	ret = __sony_nc_kbd_backlight_mode_set(value);
@@ -2720,7 +2720,7 @@ static ssize_t sony_nc_kbd_backlight_timeout_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value))
+	if (kstrtoul(buffer, 10, &value))
 		return -EINVAL;
 
 	ret = __sony_nc_kbd_backlight_timeout_set(value);
@@ -2962,7 +2962,7 @@ static ssize_t sony_nc_gsensor_type_store(struct device *dev,
 	unsigned long value;
 
 	/* sanity checks and conversion */
-	if (count > 31 || strict_strtoul(buffer, 10, &value) || value > 2)
+	if (count > 31 || kstrtoul(buffer, 10, &value) || value > 2)
 		return -EINVAL;
 
 	value <<= 0x03;
@@ -3043,7 +3043,7 @@ static ssize_t sony_nc_gsensor_status_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value) || value > 1)
+	if (kstrtoul(buffer, 10, &value) || value > 1)
 		return -EINVAL;
 
 	ret = sony_nc_gsensor_status_set(value);
@@ -3075,7 +3075,7 @@ static ssize_t sony_nc_gsensor_sensitivity_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value) || value > 2)
+	if (kstrtoul(buffer, 10, &value) || value > 2)
 		return -EINVAL;
 
 	/* retrieve the other parameters to be stored as well */
@@ -3213,7 +3213,7 @@ static ssize_t sony_nc_battery_care_limit_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value))
+	if (kstrtoul(buffer, 10, &value))
 		return -EINVAL;
 
 	/*  limit values (2 bits):
@@ -3410,7 +3410,7 @@ static ssize_t sony_nc_thermal_mode_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value) ||
+	if (kstrtoul(buffer, 10, &value) ||
 		value > (sony_thermal->profiles - 1))
 		return -EINVAL;
 
@@ -3510,7 +3510,7 @@ static ssize_t sony_nc_lid_resume_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value) || value > 3)
+	if (kstrtoul(buffer, 10, &value) || value > 3)
 		return -EINVAL;
 
 	/* 00 <- disabled
@@ -3582,7 +3582,7 @@ static ssize_t sony_nc_highspeed_charging_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value) || value > 1)
+	if (kstrtoul(buffer, 10, &value) || value > 1)
 		return -EINVAL;
 
 	if (sony_call_snc_handle(0x0131, value << 0x10 | 0x0200, &result))
@@ -3658,7 +3658,7 @@ static ssize_t sony_nc_touchpad_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value) || value > 1)
+	if (kstrtoul(buffer, 10, &value) || value > 1)
 		return -EINVAL;
 
 	/* sysfs: 0 disabled, 1 enabled; EC: 0 enabled, 1 disabled */
@@ -3736,7 +3736,7 @@ static ssize_t sony_nc_fan_control_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value)
+	if (kstrtoul(buffer, 10, &value)
 		|| value > sony_fan->speeds_num)
 		return -EINVAL;
 
@@ -3904,7 +3904,7 @@ static ssize_t sony_nc_odd_status_store(struct device *dev,
 
 	if (count > 31)
 		return -EINVAL;
-	if (strict_strtoul(buffer, 10, &value) || value > 1)
+	if (kstrtoul(buffer, 10, &value) || value > 1)
 		return -EINVAL;
 
 #if 0
@@ -5310,7 +5310,7 @@ static ssize_t sony_pic_wwanpower_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value))
+	if (kstrtoul(buffer, 10, &value))
 		return -EINVAL;
 
 	mutex_lock(&spic_dev.lock);
@@ -5349,7 +5349,7 @@ static ssize_t sony_pic_bluetoothpower_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value))
+	if (kstrtoul(buffer, 10, &value))
 		return -EINVAL;
 
 	mutex_lock(&spic_dev.lock);
@@ -5390,7 +5390,7 @@ static ssize_t sony_pic_fanspeed_store(struct device *dev,
 	if (count > 31)
 		return -EINVAL;
 
-	if (strict_strtoul(buffer, 10, &value))
+	if (kstrtoul(buffer, 10, &value))
 		return -EINVAL;
 
 	if (sony_pic_set_fanspeed(value))
