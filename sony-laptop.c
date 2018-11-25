@@ -88,7 +88,7 @@ do {						\
 } while (0)
 
 #ifdef SONY_ZSERIES
-#define SONY_LAPTOP_DRIVER_VERSION     "0.9np11"
+#define SONY_LAPTOP_DRIVER_VERSION     "0.9np12"
 #else
 #define SONY_LAPTOP_DRIVER_VERSION	"0.6"
 #endif
@@ -1421,12 +1421,12 @@ static void sony_nc_rfkill_cleanup(void)
 static int sony_nc_rfkill_set(void *data, bool blocked)
 {
 	int result;
-	int argument = sony_rfkill_address[(long) data] + 0x100;
+	int argument = sony_rfkill.address[(long) data] + 0x100;
 
 	if (!blocked)
 		argument |= 0x070000;
 
-	return sony_call_snc_handle(sony_rfkill_handle, argument, &result);
+	return sony_call_snc_handle(sony_rfkill.handle, argument, &result);
 }
 
 
@@ -1480,8 +1480,8 @@ static int sony_nc_setup_rfkill(struct acpi_device *device,
 	swblock = !(result & 0x2);
 
 	/* hard block the WWAN module if no battery is present */
-	if ((nc_type == SONY_WWAN) && wwblock)
-		swblock = true;
+	if (nc_type == SONY_WWAN)
+		swblock = false;
 
 	rfkill_init_sw_state(rfk, swblock);
 	rfkill_set_hw_state(rfk, hwblock);
