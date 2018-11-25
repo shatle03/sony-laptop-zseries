@@ -80,6 +80,7 @@
 #include <linux/version.h>
 #endif
 #include <asm/uaccess.h>
+#include <acpi/video.h>
 
 #define dprintk(fmt, ...)			\
 do {						\
@@ -88,7 +89,7 @@ do {						\
 } while (0)
 
 #ifdef SONY_ZSERIES
-#define SONY_LAPTOP_DRIVER_VERSION     "0.9np12"
+#define SONY_LAPTOP_DRIVER_VERSION     "0.9np13"
 #else
 #define SONY_LAPTOP_DRIVER_VERSION	"0.6"
 #endif
@@ -4574,12 +4575,8 @@ static int sony_nc_add(struct acpi_device *device)
 		goto outsnc;
 	}
 
-	if (acpi_video_backlight_support()) {
-		pr_info("brightness ignored, must be "
-			"controlled by ACPI video driver\n");
-	} else {
+	if (acpi_video_get_backlight_type() == acpi_backlight_vendor)
 		sony_nc_backlight_setup();
-	}
 
 	/* create sony_pf sysfs attributes related to the SNC device */
 	for (item = sony_nc_values; item->name; ++item) {
@@ -6167,7 +6164,7 @@ static int sony_pic_add(struct acpi_device *device)
 	/* request IRQ */
 	list_for_each_entry_reverse(irq, &spic_dev.interrupts, list) {
 		if (!request_irq(irq->irq.interrupts[0], sony_pic_irq,
-				IRQF_DISABLED, "sony-laptop", &spic_dev)) {
+				0, "sony-laptop", &spic_dev)) {
 			dprintk("IRQ: %d - triggering: %d - "
 					"polarity: %d - shr: %d\n",
 					irq->irq.interrupts[0],

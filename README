@@ -1,3 +1,5 @@
+### fixes to compile with kernel 4.2.0
+
 #### now fixed to compile with kernel 3.19.1 and tagged as version Sony Notebook Control Driver v0.9np11
 
 #### now fixed to compile with kernel 3.15.3 and tagged as version Sony Notebook Control Driver v0.9np10
