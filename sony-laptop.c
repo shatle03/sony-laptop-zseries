@@ -141,7 +141,7 @@ MODULE_PARM_DESC(minor,
 		 "default is -1 (automatic)");
 #endif
 
-static int kbd_backlight;	/* = 0 */
+static int kbd_backlight = 1;	/* = 0 */
 module_param(kbd_backlight, int, 0444);
 MODULE_PARM_DESC(kbd_backlight,
 		 "set this to 0 to disable keyboard backlight, "
@@ -193,8 +193,6 @@ enum sony_nc_rfkill {
 	N_SONY_RFKILL,
 };
 
-static int sony_rfkill_handle;
-static int sony_rfkill_address[N_SONY_RFKILL] = {0x300, 0x500, 0x700, 0x900};
 static int sony_nc_rfkill_setup(struct acpi_device *device,
 		unsigned int handle);
 static void sony_nc_rfkill_cleanup(void);
