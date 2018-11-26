@@ -89,7 +89,7 @@ do {						\
 } while (0)
 
 #ifdef SONY_ZSERIES
-#define SONY_LAPTOP_DRIVER_VERSION     "0.9np13"
+#define SONY_LAPTOP_DRIVER_VERSION     "0.9np14"
 #else
 #define SONY_LAPTOP_DRIVER_VERSION	"0.6"
 #endif
@@ -160,6 +160,10 @@ MODULE_PARM_DESC(force_shock_notifications,
 		"set this to 1 to force the generation of shock protection "
 		"events, even though the notebook do not support head "
 		"unloading for the installed drive drive");
+
+#ifdef CONFIG_PM_SLEEP
+static void sony_nc_thermal_resume(void);
+#endif
 
 #ifdef SONY_ZSERIES
 static int speed_stamina;
@@ -6238,7 +6242,8 @@ err_free_resources:
 	return result;
 }
 
-static int sony_pic_suspend(struct device *dev, pm_message_t state)
+#ifdef CONFIG_PM_SLEEP
+static int sony_pic_suspend(struct device *dev)
 {
 	if (sony_pic_disable(to_acpi_device(dev)))
 		return -ENXIO;
@@ -6250,6 +6255,7 @@ static int sony_pic_resume(struct device *dev)
 	sony_pic_enable(to_acpi_device(dev), spic_dev.cur_ioport, spic_dev.cur_irq);
 	return 0;
 }
+#endif
 
 static SIMPLE_DEV_PM_OPS(sony_pic_pm, sony_pic_suspend, sony_pic_resume);
 
